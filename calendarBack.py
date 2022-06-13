@@ -1,14 +1,15 @@
 import calendar as cal
 import datetime as dt
-import pytz
 from itertools import chain
+from pydantic import BaseModel
 
-class calendarRoom:
+class calendarRoom(BaseModel):
 
     def __init__(self, name: str, password: str ) -> None:
         self.cald = cal.Calendar()
         self.name = name
         self.password = password
+        self.lastMod = dt.datetime.now()
         self.hourInd = []       
         # unavailable hours individually: 
         #    (dt.datetime: starth, dt.datetime: endh)
@@ -35,6 +36,8 @@ class calendarRoom:
 
 
     def findFreeTime(self, dates: int):
+        """take int, return first int available free date ranges in list"""
+        self.lastMod = dt.datetime.now()
         date = dt.datetime.now().date()
         mon = range(1, 13)
         result = []
@@ -133,18 +136,124 @@ class calendarRoom:
             date = dt.date(date.year+1, 1, 1)
         return result[0:dates]
 
+    
+    def limitHour(self, fr: dt.datetime, to: dt.datetime):
+        """take two datetime, add their range to unavailable times"""
+        self.lastMod = dt.datetime.now()
+        self.hourInd.append((fr, to))
 
-example = calendarRoom("name", "pass")
-example.hourInd.append((dt.datetime(2022, 6, 11, 13),
-                        dt.datetime(2022, 6, 11, 17)))
-example.hourDay.append((22, 7+24)) #from 10pm to 7am next day
-example.hourWee.append((7, 1, 18)) #from 4pm to 6pm on sundays
-example.hourWee.append((3, 5, 23)) #from 5am to 11pm on wednesdays
-example.hourBiW.append((6, 1, 13, 17)) #from 1pm to 5pm on saturdays TN
-example.hourMon.append((1, 4, 9)) #first day each month from 4am to 9am
-example.reqLenH = 15    # 15 hours in a row each day
 
-x=example.findFreeTime(3)
-print(x[0], "\n")
-print(x[1], "\n")
-print(x[2], "\n")
+    def limitHourDaily(self, fr: int, to: int):
+        """take two int representing hours, add them to daily taken times"""
+        self.lastMod = dt.datetime.now()
+        if fr < to:
+            self.hourDay.append((fr, to))
+        else:
+            self.hourDay.append((fr, to+24))
+
+
+    def limitHourWeekly(self, day: int, fr: int, to: int):
+        """take day of the week and two hours as int, add them to limits"""
+        self.lastMod = dt.datetime.now()
+        if fr < to:
+            self.hourWee.append((day, fr, to))
+        else:
+            self.hourWee.append((day, fr, to+24))
+
+
+    def limitHourBiweekly(self, day: int, week: int, fr: int, to: int):
+        """take 4 int as day of week, parity of week and hour range,
+        add them to limits"""
+        self.lastMod = dt.datetime.now()
+        if fr < to:
+            self.hourBiW.append((day, week, fr, to))
+        else:
+            self.hourBiW.append((day, week, fr, to+24))
+
+
+    def limitHourMonthly(self, day: int, fr: int, to: int):
+        """take 3 int as day of month and hour range, add them to limits"""
+        self.lastMod = dt.datetime.now()
+        if fr < to:
+            self.hourMon.append((day, fr, to))
+        else:
+            self.hourMon.append((day, fr, to+24))
+
+
+    def limitDay(self, fr: dt.date, to: dt.date):
+        """take 2 date, add the range as unavailable"""
+        self.lastMod = dt.datetime.now()
+        date = dt.datetime(fr.year, fr.month, fr.day, 0)
+        while date < to:
+            d2 = dt.timedelta(days=1)+date
+            self.hourInd.append((date, d2))
+            date = d2
+
+
+    def limitDayWeekly(self, fr: int, to: int):
+        """take 2 int as day of week range, add range to weekly limit"""
+        self.lastMod = dt.datetime.now()
+        if fr <= to:
+            for i in range(fr, to+1):
+                self.hourWee.append((i, 1, 24))
+        else:
+            for i in range(fr, 8):
+                self.hourWee.append((i, 1, 24))
+            for i in range(1, to):
+                self.hourWee.append((i, 1, 24))
+
+
+    def limitDayBiweekly(self, week: int, fr: int, to: int):
+        """take 3 int as week nr and day of week range, add range to biweek"""
+        self.lastMod = dt.datetime.now()
+        if fr <= to:
+            for i in range(fr, to+1):
+                self.hourBiW.append((i, week, 1, 24))
+        else:
+            for i in range(fr, 8):
+                self.hourBiW.append((i, week, 1, 24))
+            for i in range(1, to):
+                self.hourBiW.append((i, week, 1, 24))
+    
+
+    def limitDayMonthly(self, fr: int, to: int):
+        """take 2 int as day of month range, add range to month limit"""
+        self.lastMod = dt.datetime.now()
+        for i in range(fr, to+1):
+            self.hourMon.append(i, 1, 24)
+
+
+    def removeLimitHour(self, nr: int):
+        """take list position, remove hour limit of this position"""
+        self.lastMod = dt.datetime.now()
+        if len(self.hourInd) > nr:
+            del self.hourInd[nr]
+
+
+    def removeLimitHourDaily(self, nr: int):
+        """take list position, remove daily hour limit of this position"""
+        self.lastMod = dt.datetime.now()
+        if len(self.hourDay) > nr:
+            del self.hourDay[nr]
+
+
+    def removeLimitHourWeekly(self, nr: int):
+        """take list position, remove weekly hour limit of this position"""
+        self.lastMod = dt.datetime.now()
+        if len(self.hourWee) > nr:
+            del self.hourWee[nr]
+
+
+    def removeLimitHourBiweekly(self, nr: int):
+        """take list position, remove biweekly hour limit of this position"""
+        self.lastMod = dt.datetime.now()
+        if len(self.hourBiW) > nr:
+            del self.hourBiW[nr]
+
+
+    def removeLimitHourMonthly(self, nr: int):
+        """take list position, remove monthly hour limit of this position"""
+        self.lastMod = dt.datetime.now()
+        if len(self.hourMon) > nr:
+            del self.hourMon[nr]
+
